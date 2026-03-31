@@ -1,0 +1,1356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#06090f">
+<title>TF141 · Fast</title>
+<link rel="manifest" href="manifest.json">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@300;400;500;600;700;800&family=DM+Mono:wght@400;500&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,300&display=swap" rel="stylesheet">
+<style>
+
+/* ─── TOKENS ───────────────────────────── */
+:root {
+  --bg:   #06090f;
+  --bg1:  #090d14;
+  --bg2:  #0d1420;
+  --surf: rgba(255,255,255,0.04);
+  --surf2:rgba(255,255,255,0.07);
+
+  --g:    #00ff9c;
+  --gd:   #00cc7a;
+  --gg:   rgba(0,255,156,.12);
+  --gf:   rgba(0,255,156,.05);
+
+  --gold: #f0c040;
+  --blue: #4da8ff;
+  --red:  #ff4455;
+  --redx: rgba(255,68,85,.1);
+
+  --t1:  #e6ecf4;
+  --t2:  #6b7f94;
+  --t3:  #303f50;
+  --t4:  #182030;
+
+  --ln:  rgba(255,255,255,.055);
+  --ln2: rgba(255,255,255,.09);
+  --lng: rgba(0,255,156,.15);
+
+  --r:  16px;
+  --rs: 10px;
+  --nav: 64px;
+  --px: 22px;
+
+  --fd: 'Barlow Condensed', sans-serif;
+  --fs: 'DM Sans', sans-serif;
+  --fm: 'DM Mono', monospace;
+}
+
+/* ─── RESET ────────────────────────────── */
+*,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
+html,body { height:100%; }
+
+body {
+  font-family: var(--fs);
+  background: var(--bg);
+  color: var(--t1);
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+/* Very faint grid */
+body::before {
+  content:'';
+  position:fixed; inset:0;
+  background-image:
+    linear-gradient(var(--ln) 1px,transparent 1px),
+    linear-gradient(90deg,var(--ln) 1px,transparent 1px);
+  background-size: 40px 40px;
+  pointer-events:none; z-index:0; opacity:.35;
+}
+
+/* ─── SHELL ─────────────────────────────── */
+#app {
+  display:flex; flex-direction:column;
+  height:100dvh; max-width:430px;
+  margin:0 auto; position:relative; overflow:hidden;
+}
+
+/* Ambient green glow at top */
+#app::after {
+  content:'';
+  position:fixed; top:-100px; left:50%; transform:translateX(-50%);
+  width:440px; height:340px;
+  background:radial-gradient(ellipse,rgba(0,255,156,.038) 0%,transparent 65%);
+  pointer-events:none; z-index:1; transition:background .8s;
+}
+body.fasting  #app::after { background:radial-gradient(ellipse,rgba(0,255,156,.07) 0%,transparent 65%); }
+body.achieved #app::after { background:radial-gradient(ellipse,rgba(240,192,64,.06) 0%,transparent 65%); }
+
+/* ─── VIEWS ─────────────────────────────── */
+.view {
+  display:none; flex-direction:column; flex:1;
+  overflow-y:auto; overflow-x:hidden;
+  padding-bottom:calc(var(--nav) + 8px);
+  position:relative; z-index:2;
+  -webkit-overflow-scrolling:touch;
+  scrollbar-width:none;
+}
+.view::-webkit-scrollbar { display:none; }
+.view.active { display:flex; animation:vIn .2s ease; }
+@keyframes vIn { from{opacity:0;transform:translateY(5px)} to{opacity:1;transform:none} }
+
+/* ─── BOTTOM NAV ─────────────────────────── */
+#nav {
+  position:fixed; bottom:0; left:50%; transform:translateX(-50%);
+  width:100%; max-width:430px;
+  height:calc(var(--nav) + env(safe-area-inset-bottom,0px));
+  padding-bottom:env(safe-area-inset-bottom,0px);
+  background:rgba(6,9,15,.92);
+  backdrop-filter:blur(28px) saturate(1.6);
+  -webkit-backdrop-filter:blur(28px) saturate(1.6);
+  border-top:1px solid var(--ln);
+  display:flex; align-items:center; justify-content:space-around;
+  z-index:100;
+}
+#nav::before {
+  content:''; position:absolute; top:0; left:15%; right:15%; height:1px;
+  background:linear-gradient(90deg,transparent,rgba(0,255,156,.14),transparent);
+}
+.nt {
+  display:flex; flex-direction:column; align-items:center; gap:4px;
+  background:none; border:none; color:var(--t3);
+  font-family:var(--fs); font-size:10px; font-weight:500;
+  letter-spacing:.02em; cursor:pointer; padding:8px 20px;
+  transition:color .15s; position:relative;
+}
+.nt svg { width:20px; height:20px; stroke-width:1.5; transition:all .15s; }
+.nt.on { color:var(--g); }
+.nt.on svg { filter:drop-shadow(0 0 4px rgba(0,255,156,.6)); transform:translateY(-1px); }
+.nt.on::after {
+  content:''; position:absolute; bottom:2px;
+  left:32%; right:32%; height:2px;
+  background:var(--g); border-radius:2px;
+  box-shadow:0 0 8px rgba(0,255,156,.7);
+}
+.nt:active { opacity:.65; }
+
+/* ─── SHARED ─────────────────────────────── */
+.pg-head { padding:max(54px,env(safe-area-inset-top,54px)) var(--px) 0; margin-bottom:28px; }
+.pg-title { font-family:var(--fd); font-size:36px; font-weight:700; letter-spacing:.04em; line-height:1; }
+.pg-sub { font-size:12px; color:var(--t3); margin-top:5px; }
+
+.sec {
+  font-size:10px; font-weight:600; letter-spacing:.12em; color:var(--t3);
+  text-transform:uppercase; padding:0 var(--px); margin-bottom:10px;
+  display:flex; align-items:center; gap:10px;
+}
+.sec::after { content:''; flex:1; height:1px; background:var(--ln); }
+
+/* ─── TIMER VIEW ─────────────────────────── */
+#view-timer { padding-top:0; }
+
+/* Top bar */
+#topbar {
+  padding:max(54px,env(safe-area-inset-top,54px)) var(--px) 0;
+  display:flex; align-items:flex-start; justify-content:space-between;
+  margin-bottom:36px;
+}
+.brand { font-family:var(--fd); font-size:12px; font-weight:700; letter-spacing:.24em; color:var(--g); line-height:1; text-shadow:0 0 14px rgba(0,255,156,.3); }
+.brand-sub { font-family:var(--fm); font-size:9px; color:var(--t3); letter-spacing:.1em; margin-top:4px; }
+
+/* Status pill */
+.spill {
+  display:flex; align-items:center; gap:6px;
+  padding:5px 11px;
+  border:1px solid var(--ln); border-radius:100px;
+  font-family:var(--fm); font-size:10px; color:var(--t3); letter-spacing:.06em;
+  background:transparent; transition:all .3s;
+}
+.spill .sd { width:5px; height:5px; border-radius:50%; background:var(--t3); transition:all .3s; flex-shrink:0; }
+.spill.on  { color:var(--g); border-color:var(--lng); }
+.spill.on .sd { background:var(--g); box-shadow:0 0 0 2px rgba(0,255,156,.18); animation:sdp 2s ease-in-out infinite; }
+.spill.ach { color:var(--gold); border-color:rgba(240,192,64,.3); }
+.spill.ach .sd { background:var(--gold); animation:sdp .9s ease-in-out infinite; }
+@keyframes sdp { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.35;transform:scale(.65)} }
+
+/* ── THE TIMER — absolute hero ── */
+#timer-section {
+  padding:0 var(--px);
+  margin-bottom:40px;
+  text-align:center;
+}
+#timer-eyebrow {
+  font-family:var(--fm); font-size:9px; letter-spacing:.2em;
+  color:var(--t3); text-transform:uppercase; margin-bottom:12px;
+}
+#timer-display {
+  font-family:var(--fm);
+  font-size:86px;
+  font-weight:400;
+  letter-spacing:.04em;
+  line-height:1;
+  color:var(--t2);
+  transition:color .5s, text-shadow .5s;
+  margin-bottom:16px;
+}
+body.fasting  #timer-display { color:var(--g);   text-shadow:0 0 48px rgba(0,255,156,.3), 0 0 90px rgba(0,255,156,.1); animation:tf 14s ease-in-out infinite; }
+body.achieved #timer-display { color:var(--gold); text-shadow:0 0 48px rgba(240,192,64,.35),0 0 90px rgba(240,192,64,.12); }
+@keyframes tf { 0%,92%,96%,100%{opacity:1} 94%{opacity:.88} }
+
+#timer-goal-lbl {
+  font-family:var(--fs); font-size:13px; color:var(--t3); margin-bottom:20px;
+}
+#timer-goal-lbl b { color:var(--t2); font-weight:500; }
+
+/* Progress bar — thin elegant line */
+#prog-track {
+  height:1px; background:var(--t4); border-radius:1px;
+  overflow:visible; position:relative; margin-bottom:10px;
+}
+#prog-fill {
+  height:100%; width:0%; background:var(--g); border-radius:1px;
+  transition:width .9s linear; position:relative;
+  box-shadow:0 0 6px rgba(0,255,156,.6);
+}
+#prog-fill::after {
+  content:''; position:absolute; right:-4px; top:-3px;
+  width:7px; height:7px; border-radius:50%;
+  background:var(--g); box-shadow:0 0 10px rgba(0,255,156,.9);
+  transition:background .4s;
+}
+body.achieved #prog-fill { background:var(--gold); box-shadow:0 0 6px rgba(240,192,64,.6); }
+body.achieved #prog-fill::after { background:var(--gold); box-shadow:0 0 10px rgba(240,192,64,.9); }
+
+#prog-meta {
+  display:flex; justify-content:space-between;
+  font-family:var(--fm); font-size:9px; color:var(--t3); letter-spacing:.05em;
+}
+
+/* ── Goal achieved ── */
+#achieved-wrap { padding:0 var(--px); margin-bottom:28px; display:none; }
+#achieved-wrap.show { display:block; }
+.achieved-inner {
+  background:rgba(240,192,64,.06);
+  border:1px solid rgba(240,192,64,.22);
+  border-radius:var(--rs);
+  padding:14px 18px;
+  display:flex; align-items:center; gap:14px;
+  animation:popIn .4s cubic-bezier(.34,1.56,.64,1);
+}
+@keyframes popIn { from{transform:scale(.96);opacity:0} to{transform:none;opacity:1} }
+.ach-icon { font-size:22px; }
+.ach-title { font-family:var(--fd); font-size:17px; font-weight:700; color:var(--gold); letter-spacing:.06em; }
+.ach-sub { font-size:11px; color:var(--t3); margin-top:2px; }
+
+/* ── Price operator strip ── */
+#op-strip {
+  padding:0 var(--px);
+  margin-bottom:28px;
+  display:flex; align-items:center; gap:16px;
+}
+#price-frame {
+  position:relative; flex-shrink:0;
+  width:44px; height:56px;
+  display:flex; align-items:center; justify-content:center;
+}
+/* corner brackets */
+#price-frame::before,#price-frame::after,
+#price-frame .c1::before,#price-frame .c1::after {
+  content:''; position:absolute;
+  width:7px; height:7px;
+  border-color:var(--t3); border-style:solid; transition:border-color .4s;
+}
+#price-frame::before { top:0;left:0;border-width:1px 0 0 1px; }
+#price-frame::after  { bottom:0;right:0;border-width:0 1px 1px 0; }
+body.fasting #price-frame::before,
+body.fasting #price-frame::after { border-color:var(--g); }
+#price-frame .c1 { position:absolute;inset:0;pointer-events:none; }
+#price-frame .c1::before { top:0;right:0;border-width:1px 1px 0 0; border-color:var(--t3); transition:border-color .4s; }
+#price-frame .c1::after  { bottom:0;left:0;border-width:0 0 1px 1px; border-color:var(--t3); transition:border-color .4s; }
+body.fasting #price-frame .c1::before,
+body.fasting #price-frame .c1::after { border-color:var(--g); }
+
+#price-cv {
+  width:38px; height:48px;
+  image-rendering:pixelated; image-rendering:crisp-edges;
+  filter:brightness(.7) saturate(.7);
+  transition:filter .5s;
+}
+body.fasting  #price-cv { filter:brightness(.95) saturate(1) drop-shadow(0 0 5px rgba(0,255,156,.28)); }
+body.achieved #price-cv { filter:brightness(1) saturate(1.1) drop-shadow(0 0 6px rgba(240,192,64,.4)); }
+
+#op-info { flex:1; min-width:0; }
+#op-rank {
+  font-family:var(--fm); font-size:8px; color:var(--t3);
+  letter-spacing:.16em; text-transform:uppercase; margin-bottom:5px;
+  transition:color .3s;
+}
+body.fasting #op-rank { color:var(--g); }
+#op-quote {
+  font-family:var(--fs); font-size:12px; color:var(--t2);
+  line-height:1.55; font-style:italic; font-weight:300;
+  transition:opacity .28s;
+}
+
+/* ── Goal selector ── */
+#goal-section { padding:0 var(--px); margin-bottom:20px; }
+.goal-top {
+  display:flex; align-items:center; justify-content:space-between;
+  margin-bottom:10px;
+}
+.goal-lbl { font-family:var(--fm); font-size:9px; color:var(--t3); letter-spacing:.16em; text-transform:uppercase; }
+.goal-custom { display:flex; align-items:center; gap:5px; }
+#goal-input {
+  width:42px; background:transparent;
+  border:none; border-bottom:1px solid var(--gd);
+  color:var(--g); font-family:var(--fm); font-size:15px; font-weight:500;
+  padding:2px 4px; text-align:center; outline:none; -moz-appearance:textfield;
+  transition:box-shadow .15s;
+}
+#goal-input::-webkit-outer-spin-button,
+#goal-input::-webkit-inner-spin-button { -webkit-appearance:none; }
+#goal-input:focus { box-shadow:0 2px 0 var(--g); }
+.goal-unit { font-family:var(--fm); font-size:10px; color:var(--t3); }
+
+#presets {
+  display:grid; grid-template-columns:repeat(6,1fr); gap:5px;
+}
+.gp {
+  background:transparent; border:1px solid var(--ln); border-radius:8px;
+  color:var(--t3); font-family:var(--fm); font-size:11px;
+  padding:8px 2px; cursor:pointer; text-align:center; transition:all .13s;
+}
+.gp.on { border-color:var(--gd); color:var(--g); background:var(--gf); }
+.gp:active { transform:scale(.9); }
+
+/* ── Primary CTA ── */
+#cta { padding:0 var(--px); margin-bottom:16px; display:flex; gap:10px; }
+#btn-go {
+  flex:1; padding:19px 16px;
+  background:var(--g); color:#000;
+  border:none; border-radius:var(--r);
+  font-family:var(--fd); font-size:22px; font-weight:700; letter-spacing:.1em;
+  cursor:pointer; transition:all .15s;
+  display:flex; align-items:center; justify-content:center; gap:9px;
+  box-shadow:0 0 32px rgba(0,255,156,.22), 0 8px 24px rgba(0,0,0,.35);
+}
+#btn-go:active { transform:scale(.97); }
+#btn-go:hover  { box-shadow:0 0 48px rgba(0,255,156,.32), 0 8px 28px rgba(0,0,0,.4); }
+#btn-go.stop {
+  background:var(--redx); color:var(--red);
+  border:1px solid rgba(255,68,85,.28); box-shadow:none;
+}
+#btn-go.stop:hover { background:rgba(255,68,85,.15); }
+body.fasting #btn-go:not(.stop) { animation:glow 3.5s ease-in-out infinite; }
+@keyframes glow { 0%,100%{box-shadow:0 0 32px rgba(0,255,156,.22),0 8px 24px rgba(0,0,0,.35)} 50%{box-shadow:0 0 52px rgba(0,255,156,.4),0 8px 28px rgba(0,0,0,.4)} }
+
+#btn-rst {
+  width:58px; background:transparent;
+  border:1px solid var(--ln); border-radius:var(--r);
+  color:var(--t3); font-size:19px;
+  cursor:pointer; transition:all .15s;
+  display:flex; align-items:center; justify-content:center;
+}
+#btn-rst:active { transform:scale(.94); border-color:var(--ln2); color:var(--t2); }
+
+/* ── Feedback chips ── */
+#chips { display:flex; gap:8px; padding:0 var(--px); }
+.chip {
+  flex:1; padding:12px 14px;
+  border:1px solid var(--ln); border-radius:var(--rs);
+  background:transparent;
+}
+.chip-l { font-family:var(--fm); font-size:8px; color:var(--t3); letter-spacing:.14em; text-transform:uppercase; margin-bottom:5px; }
+.chip-v { font-family:var(--fd); font-size:20px; font-weight:600; color:var(--t1); letter-spacing:.02em; line-height:1; }
+.chip-v.g { color:var(--g); }
+
+/* ─── LOG VIEW ───────────────────────── */
+.log-bar { display:flex; gap:8px; padding:0 var(--px); margin-bottom:16px; }
+.lbtn {
+  flex:1; padding:10px 8px;
+  background:transparent; border:1px solid var(--ln); border-radius:var(--rs);
+  color:var(--t2); font-family:var(--fs); font-size:12px; font-weight:500;
+  cursor:pointer; transition:all .13s;
+  display:flex; align-items:center; justify-content:center; gap:6px;
+}
+.lbtn:active { transform:scale(.97); }
+.lbtn svg { width:13px; height:13px; }
+.lbtn.danger { color:var(--red); border-color:rgba(255,68,85,.2); }
+.lbtn.danger:active { background:var(--redx); }
+
+#log-list { padding:0 var(--px); display:flex; flex-direction:column; gap:8px; }
+
+.litem {
+  border:1px solid var(--ln); border-radius:var(--r);
+  padding:15px 16px; display:flex; align-items:center; gap:13px;
+  position:relative; overflow:hidden; background:transparent;
+  animation:fup .2s ease;
+}
+@keyframes fup { from{opacity:0;transform:translateY(4px)} to{opacity:1} }
+.litem::before {
+  content:''; position:absolute; left:0; top:14px; bottom:14px;
+  width:2px; background:var(--gd); border-radius:2px; opacity:.45;
+}
+.litem.gold::before { background:var(--gold); opacity:.7; }
+
+.lico { width:40px; height:40px; border-radius:10px; background:var(--surf); display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0; }
+.lbody { flex:1; min-width:0; }
+.ldur { font-family:var(--fd); font-size:24px; font-weight:700; color:var(--t1); letter-spacing:.02em; line-height:1; }
+.lmeta { font-size:11px; color:var(--t3); margin-top:3px; }
+.lnote { font-size:11px; color:var(--t2); font-style:italic; margin-top:2px; }
+
+.lbadge { font-family:var(--fm); font-size:9px; padding:3px 8px; border-radius:6px; letter-spacing:.06em; flex-shrink:0; border:1px solid; }
+.lbadge.ok { color:var(--gold); border-color:rgba(240,192,64,.25); }
+.lbadge.partial { color:var(--t3); border-color:var(--ln); }
+.lbadge.manual { color:var(--blue); border-color:rgba(77,168,255,.2); }
+
+.ldel { width:30px; height:30px; background:none; border:none; color:var(--t3); cursor:pointer; border-radius:8px; display:flex; align-items:center; justify-content:center; transition:all .13s; flex-shrink:0; }
+.ldel:active { color:var(--red); background:var(--redx); }
+.ldel svg { width:15px; height:15px; }
+
+#lempty { text-align:center; padding:72px var(--px); color:var(--t3); }
+#lempty .ei { font-size:40px; margin-bottom:14px; display:block; opacity:.28; }
+#lempty .et { font-family:var(--fd); font-size:22px; font-weight:600; color:var(--t2); margin-bottom:6px; letter-spacing:.04em; }
+#lempty .eh { font-size:13px; line-height:1.7; }
+
+/* ─── INTEL VIEW ─────────────────────── */
+.sgrid { display:grid; grid-template-columns:1fr 1fr; gap:8px; padding:0 var(--px); margin-bottom:14px; }
+.stile { border:1px solid var(--ln); border-radius:var(--r); padding:18px 16px; background:transparent; }
+.stile.wide { grid-column:span 2; }
+.stile .si { font-size:15px; margin-bottom:9px; display:block; opacity:.55; }
+.stile .sv { font-family:var(--fd); font-size:30px; font-weight:700; color:var(--t1); line-height:1; margin-bottom:4px; letter-spacing:.02em; }
+.stile .sv.g    { color:var(--g); }
+.stile .sv.gold { color:var(--gold); }
+.stile .sv.nd   { font-family:var(--fs); font-size:13px; font-weight:400; color:var(--t3); }
+.stile .sl { font-family:var(--fm); font-size:9px; font-weight:500; letter-spacing:.1em; color:var(--t3); text-transform:uppercase; }
+.ndmsg { font-size:11px; color:var(--t3); text-align:center; padding:0 var(--px) 12px; font-style:italic; }
+
+.wchart { border:1px solid var(--ln); border-radius:var(--r); padding:16px; margin:0 var(--px) 14px; background:transparent; }
+.wbars { display:flex; align-items:flex-end; gap:5px; height:56px; margin-bottom:8px; }
+.wbw { flex:1; display:flex; flex-direction:column; align-items:center; gap:5px; height:100%; justify-content:flex-end; }
+.wb { width:100%; background:rgba(0,255,156,.2); border-radius:3px 3px 0 0; min-height:2px; transition:height .5s ease; }
+.wb.today { background:var(--g); box-shadow:0 0 8px rgba(0,255,156,.4); }
+.wb.empty { background:var(--t4); }
+.wb.cur   { background:var(--blue); box-shadow:0 0 6px rgba(77,168,255,.4); }
+.wd { font-family:var(--fm); font-size:8px; color:var(--t3); }
+.wd.today { color:var(--g); }
+
+.calwrap { border:1px solid var(--ln); border-radius:var(--r); padding:16px; margin:0 var(--px) 10px; }
+.calhead { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
+.calmth { font-family:var(--fd); font-size:20px; font-weight:700; color:var(--t1); letter-spacing:.04em; }
+.calcnt { font-family:var(--fm); font-size:9px; color:var(--t3); letter-spacing:.08em; }
+.calgrid { display:grid; grid-template-columns:repeat(7,1fr); gap:3px; }
+.cc { aspect-ratio:1; display:flex; align-items:center; justify-content:center; font-family:var(--fm); font-size:9px; color:var(--t3); border-radius:5px; }
+.cc.lbl { font-size:8px; opacity:.5; }
+.cc.fasted   { background:rgba(0,255,156,.1);  color:var(--g); }
+.cc.achieved { background:rgba(240,192,64,.1); color:var(--gold); }
+.cc.today    { border:1px solid var(--gd); }
+
+/* ─── CONFIG VIEW ─────────────────────── */
+.cfgsec { padding:0 var(--px); margin-bottom:8px; }
+.cfggrp { border:1px solid var(--ln); border-radius:var(--r); overflow:hidden; background:transparent; }
+.cfgrow { display:flex; align-items:center; justify-content:space-between; padding:16px; border-bottom:1px solid var(--ln); }
+.cfgrow:last-child { border-bottom:none; }
+.cfgt { font-size:15px; font-weight:500; color:var(--t1); }
+.cfgd { font-size:11px; color:var(--t3); margin-top:2px; }
+.cfgact {
+  background:transparent; border:1px solid var(--ln2); border-radius:8px;
+  color:var(--g); font-family:var(--fs); font-size:12px; font-weight:600;
+  padding:8px 14px; cursor:pointer; transition:all .13s; white-space:nowrap;
+}
+.cfgact:active { transform:scale(.96); }
+.cfgact.danger { color:var(--red); border-color:rgba(255,68,85,.2); }
+.cfgact.danger:active { background:var(--redx); }
+
+.tog { width:44px; height:24px; background:rgba(255,255,255,.07); border:1px solid var(--ln2); border-radius:12px; position:relative; cursor:pointer; transition:all .2s; flex-shrink:0; }
+.tog::after { content:''; position:absolute; top:3px; left:3px; width:16px; height:16px; border-radius:50%; background:var(--t3); transition:all .2s cubic-bezier(.4,0,.2,1); }
+.tog.on { border-color:var(--gd); background:rgba(0,255,156,.15); }
+.tog.on::after { left:calc(100% - 19px); background:var(--g); box-shadow:0 0 8px rgba(0,255,156,.5); }
+
+.cfggoals { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:10px; }
+.cgopt { background:transparent; border:1px solid var(--ln); border-radius:var(--rs); color:var(--t2); font-family:var(--fs); font-size:13px; font-weight:500; padding:11px; text-align:center; cursor:pointer; transition:all .13s; }
+.cgopt.on { border-color:var(--gd); color:var(--g); background:var(--gf); }
+.cgopt:active { transform:scale(.94); }
+
+.cfgfoot { text-align:center; padding:22px var(--px) 10px; font-family:var(--fm); font-size:10px; color:var(--t3); line-height:2.2; letter-spacing:.06em; }
+
+/* ─── SHEET ───────────────────────────── */
+#overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.72); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); z-index:200; align-items:flex-end; justify-content:center; padding:14px; }
+#overlay.open { display:flex; }
+#sheet {
+  background:#0d1420; border:1px solid var(--ln2);
+  border-top:1px solid rgba(0,255,156,.12);
+  border-radius:20px 20px 14px 14px; padding:24px;
+  width:100%; max-width:400px;
+  animation:shup .26s cubic-bezier(.34,1.56,.64,1); position:relative;
+}
+@keyframes shup { from{transform:translateY(18px);opacity:0} to{transform:none;opacity:1} }
+#sheet::before { content:''; position:absolute; top:10px; left:50%; transform:translateX(-50%); width:34px; height:3px; background:var(--ln2); border-radius:2px; }
+.shtitle { font-family:var(--fd); font-size:24px; font-weight:700; letter-spacing:.04em; color:var(--t1); margin-bottom:18px; margin-top:8px; }
+.srow { margin-bottom:12px; }
+.slbl { font-family:var(--fm); font-size:9px; color:var(--t3); letter-spacing:.18em; text-transform:uppercase; display:block; margin-bottom:6px; }
+.sinput { width:100%; background:rgba(255,255,255,.05); border:1px solid var(--ln2); border-radius:var(--rs); color:var(--t1); font-family:var(--fs); font-size:14px; padding:11px 13px; outline:none; transition:border-color .15s, box-shadow .15s; color-scheme:dark; }
+.sinput:focus { border-color:var(--gd); box-shadow:0 0 0 3px rgba(0,255,156,.1); }
+textarea.sinput { resize:vertical; min-height:66px; }
+.sacts { display:flex; gap:10px; margin-top:18px; }
+.sbtn { flex:1; padding:14px; border:none; border-radius:var(--rs); font-family:var(--fs); font-size:14px; font-weight:600; cursor:pointer; transition:all .14s; }
+.sbtn:active { transform:scale(.97); }
+.sbtn.ok { background:var(--g); color:#000; }
+.sbtn.ok:hover { box-shadow:0 0 20px rgba(0,255,156,.25); }
+.sbtn.cancel { background:rgba(255,255,255,.06); color:var(--t2); }
+.sctxt { font-size:13px; color:var(--t2); line-height:1.65; }
+
+/* ─── TOAST ───────────────────────────── */
+#toast {
+  position:fixed; bottom:calc(var(--nav) + 14px); left:50%;
+  transform:translateX(-50%) translateY(14px);
+  background:rgba(12,18,28,.97); border:1px solid var(--ln2);
+  border-left:2px solid var(--g); border-radius:100px;
+  padding:10px 20px; font-size:13px; font-weight:500; color:var(--t1);
+  z-index:500; opacity:0; pointer-events:none;
+  transition:all .22s cubic-bezier(.4,0,.2,1);
+  white-space:nowrap; max-width:90vw;
+  backdrop-filter:blur(14px);
+}
+#toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+.hidden { display:none !important; }
+
+/* ─── PHASES VIEW ───────────────────────── */
+#view-phases { padding-top:0; }
+
+/* Top header */
+#ph-head {
+  padding:max(54px,env(safe-area-inset-top,54px)) var(--px) 0;
+  margin-bottom:28px;
+}
+#ph-title {
+  font-family:var(--fd); font-size:36px; font-weight:700;
+  letter-spacing:.04em; line-height:1; margin-bottom:6px;
+}
+#ph-disclaimer {
+  font-family:var(--fm); font-size:9px; color:var(--t3);
+  letter-spacing:.1em; line-height:1.6;
+  padding:8px 10px;
+  border:1px solid var(--ln); border-radius:6px;
+  margin-top:10px;
+}
+
+/* Hero current phase card */
+#ph-hero {
+  margin:0 var(--px) 24px;
+  padding:22px 20px;
+  border:1px solid var(--ln); border-radius:var(--r);
+  position:relative; overflow:hidden;
+  transition:border-color .5s;
+}
+#ph-hero.active-phase { border-color:var(--lng); }
+#ph-hero.active-phase::before {
+  content:'';
+  position:absolute; inset:0;
+  background:radial-gradient(ellipse at 50% 0%, rgba(0,255,156,.06) 0%, transparent 70%);
+  pointer-events:none;
+}
+#ph-hero-eyebrow {
+  font-family:var(--fm); font-size:9px; color:var(--t3);
+  letter-spacing:.18em; text-transform:uppercase; margin-bottom:10px;
+}
+#ph-hero-phase {
+  font-family:var(--fd); font-size:32px; font-weight:700;
+  color:var(--t1); letter-spacing:.04em; line-height:1.1;
+  margin-bottom:4px; transition:color .5s;
+}
+#ph-hero.active-phase #ph-hero-phase { color:var(--g); text-shadow:0 0 24px rgba(0,255,156,.25); }
+#ph-hero-sub {
+  font-size:12px; color:var(--t2); margin-bottom:16px;
+  line-height:1.5; font-style:italic; font-weight:300;
+}
+#ph-hero-elapsed {
+  font-family:var(--fm); font-size:28px; font-weight:500;
+  color:var(--g); letter-spacing:.06em; line-height:1;
+  margin-bottom:12px;
+}
+#ph-hero.inactive #ph-hero-elapsed { color:var(--t3); }
+
+/* Next milestone */
+#ph-next {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:10px 12px;
+  background:rgba(255,255,255,.03);
+  border:1px solid var(--ln); border-radius:var(--rs);
+}
+#ph-next-label { font-family:var(--fm); font-size:9px; color:var(--t3); letter-spacing:.12em; text-transform:uppercase; margin-bottom:3px; }
+#ph-next-name  { font-size:13px; font-weight:500; color:var(--t1); }
+#ph-next-countdown { font-family:var(--fm); font-size:18px; color:var(--gold); letter-spacing:.04em; font-weight:500; }
+#ph-next.done { display:none; }
+
+/* Standby state */
+#ph-standby {
+  text-align:center; padding:20px var(--px) 0;
+  font-size:13px; color:var(--t3); line-height:1.7;
+}
+#ph-standby .ph-sb-icon { font-size:36px; margin-bottom:12px; display:block; opacity:.3; }
+#ph-standby .ph-sb-t { font-family:var(--fd); font-size:22px; color:var(--t2); margin-bottom:6px; font-weight:600; letter-spacing:.04em; }
+
+/* ── Vertical timeline ── */
+#ph-timeline {
+  padding:0 var(--px);
+  margin-bottom:12px;
+  position:relative;
+}
+
+/* The vertical connector line (background) */
+#ph-line-track {
+  position:absolute;
+  left:calc(var(--px) + 19px); /* aligned to center of icon */
+  top:0; bottom:0; width:1px;
+  background:var(--t4);
+  z-index:0;
+}
+
+/* The fill line — grows as fast progresses */
+#ph-line-fill {
+  position:absolute;
+  left:calc(var(--px) + 19px);
+  top:0; width:1px;
+  height:0%;
+  background:linear-gradient(180deg, var(--g), rgba(0,255,156,.3));
+  z-index:1;
+  transition:height 1s linear;
+  box-shadow:0 0 6px rgba(0,255,156,.3);
+}
+
+/* Phase row */
+.ph-row {
+  display:flex; align-items:flex-start; gap:16px;
+  padding:14px 0;
+  position:relative; z-index:2;
+  transition:opacity .4s;
+}
+.ph-row:last-child { padding-bottom:0; }
+
+/* Icon circle */
+.ph-icon-wrap {
+  width:38px; height:38px; flex-shrink:0;
+  border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  font-size:16px;
+  border:1px solid var(--t4);
+  background:var(--bg);
+  transition:all .4s;
+  position:relative; z-index:2;
+}
+
+/* Completed */
+.ph-row.done .ph-icon-wrap {
+  border-color:var(--gd);
+  background:rgba(0,255,156,.08);
+}
+.ph-row.done .ph-icon-wrap::after {
+  content:'✓';
+  position:absolute; bottom:-2px; right:-2px;
+  width:14px; height:14px; border-radius:50%;
+  background:var(--g); color:#000;
+  font-size:8px; font-weight:800;
+  display:flex; align-items:center; justify-content:center;
+  line-height:14px; text-align:center;
+}
+
+/* Active */
+.ph-row.active .ph-icon-wrap {
+  border-color:var(--g);
+  background:rgba(0,255,156,.1);
+  box-shadow:0 0 0 3px rgba(0,255,156,.12), 0 0 16px rgba(0,255,156,.2);
+  animation:ph-pulse 2.5s ease-in-out infinite;
+}
+@keyframes ph-pulse {
+  0%,100%{ box-shadow:0 0 0 3px rgba(0,255,156,.12), 0 0 16px rgba(0,255,156,.2); }
+  50%    { box-shadow:0 0 0 5px rgba(0,255,156,.06), 0 0 24px rgba(0,255,156,.3); }
+}
+
+/* Upcoming */
+.ph-row.upcoming { opacity:.35; }
+
+/* Phase text */
+.ph-content { flex:1; min-width:0; padding-top:6px; }
+.ph-hour {
+  font-family:var(--fm); font-size:9px; color:var(--t3);
+  letter-spacing:.14em; margin-bottom:4px;
+}
+.ph-row.done .ph-hour,
+.ph-row.active .ph-hour { color:var(--gd); }
+
+.ph-name {
+  font-family:var(--fd); font-size:18px; font-weight:600;
+  color:var(--t2); letter-spacing:.04em; line-height:1; margin-bottom:3px;
+  transition:color .4s;
+}
+.ph-row.done   .ph-name { color:var(--t1); }
+.ph-row.active .ph-name { color:var(--g); text-shadow:0 0 16px rgba(0,255,156,.2); }
+
+.ph-desc {
+  font-size:11px; color:var(--t3); line-height:1.5;
+  font-style:italic; font-weight:300;
+}
+.ph-row.done   .ph-desc { color:var(--t2); }
+.ph-row.active .ph-desc { color:var(--t2); }
+
+/* "You are here" badge */
+.ph-here {
+  display:none;
+  margin-top:6px;
+  font-family:var(--fm); font-size:8px;
+  color:var(--g); letter-spacing:.14em;
+  text-transform:uppercase;
+}
+.ph-row.active .ph-here { display:block; }
+
+/* Sub-progress bar within active phase */
+.ph-subprog {
+  display:none;
+  margin-top:8px;
+  height:1px; background:var(--t4); border-radius:1px; overflow:visible;
+  position:relative;
+}
+.ph-row.active .ph-subprog { display:block; }
+.ph-subprog-fill {
+  height:100%; width:0%;
+  background:var(--g); border-radius:1px;
+  transition:width 1s linear;
+}
+.ph-subprog-fill::after {
+  content:''; position:absolute; right:-3px; top:-2.5px;
+  width:6px; height:6px; border-radius:50%;
+  background:var(--g); box-shadow:0 0 8px rgba(0,255,156,.8);
+}
+
+/* Nav reduced font on small screens when 5 tabs */
+#nav .nt { padding:8px 12px; }
+</style>
+</head>
+<body>
+<div id="app">
+
+<!-- ══ TIMER ══════════════════════════════ -->
+<div id="view-timer" class="view active">
+
+  <div id="topbar">
+    <div>
+      <div class="brand">Task Force 141</div>
+      <div class="brand-sub">Fasting Protocol</div>
+    </div>
+    <div class="spill" id="spill"><div class="sd"></div><span id="stext">Standby</span></div>
+  </div>
+
+  <!-- TIMER — hero -->
+  <div id="timer-section">
+    <div id="timer-eyebrow">Elapsed Time</div>
+    <div id="timer-display">00:00:00</div>
+    <div id="timer-goal-lbl">Goal: <b id="goal-lbl-val">16h</b></div>
+    <div id="prog-track"><div id="prog-fill"></div></div>
+    <div id="prog-meta"><span id="prog-pct">0%</span><span id="prog-remain">Not fasting</span></div>
+  </div>
+
+  <!-- Goal achieved -->
+  <div id="achieved-wrap">
+    <div class="achieved-inner">
+      <div class="ach-icon">🏆</div>
+      <div><div class="ach-title">Goal Achieved</div><div class="ach-sub">Mission complete. Price approves.</div></div>
+    </div>
+  </div>
+
+  <!-- Operator strip -->
+  <div id="op-strip">
+    <div id="price-frame">
+      <div class="c1"></div>
+      <canvas id="price-cv" width="32" height="40"></canvas>
+    </div>
+    <div id="op-info">
+      <div id="op-rank">OPERATOR: <span id="stage-name">READY</span></div>
+      <div id="op-quote">"Discipline beats motivation. Every time."</div>
+    </div>
+  </div>
+
+  <!-- Goal selector -->
+  <div id="goal-section">
+    <div class="goal-top">
+      <div class="goal-lbl">Fasting Goal</div>
+      <div class="goal-custom">
+        <input type="number" id="goal-input" min="1" max="72" value="16">
+        <span class="goal-unit">h</span>
+      </div>
+    </div>
+    <div id="presets">
+      <button class="gp" data-h="12">12h</button>
+      <button class="gp" data-h="14">14h</button>
+      <button class="gp on" data-h="16">16h</button>
+      <button class="gp" data-h="18">18h</button>
+      <button class="gp" data-h="20">20h</button>
+      <button class="gp" data-h="24">24h</button>
+    </div>
+  </div>
+
+  <!-- CTA -->
+  <div id="cta">
+    <button id="btn-go"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg> Start Fast</button>
+    <button id="btn-rst">↺</button>
+  </div>
+
+  <!-- Chips -->
+  <div id="chips">
+    <div class="chip"><div class="chip-l">Last Fast</div><div class="chip-v" id="ch-last">—</div></div>
+    <div class="chip"><div class="chip-l">Streak</div><div class="chip-v g" id="ch-streak">—</div></div>
+    <div class="chip"><div class="chip-l">Total</div><div class="chip-v" id="ch-total">0</div></div>
+  </div>
+
+</div>
+
+<!-- ══ LOG ═══════════════════════════════ -->
+<div id="view-log" class="view">
+  <div class="pg-head"><div class="pg-title">Mission Log</div><div class="pg-sub" id="log-sub">0 fasts recorded</div></div>
+  <div class="log-bar">
+    <button class="lbtn" id="btn-manual"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Log Manual</button>
+    <button class="lbtn danger" id="btn-clearlog"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3,6 5,6 21,6"/><path d="M19,6v14a2,2,0,0,1-2,2H7a2,2,0,0,1-2-2V6m3,0V4a2,2,0,0,1,2-2h4a2,2,0,0,1,2,2v2"/></svg>Clear All</button>
+  </div>
+  <div id="log-list"></div>
+  <div id="lempty" class="hidden"><span class="ei">📋</span><div class="et">No Missions Logged</div><div class="eh">Complete your first fast<br>to start your record.</div></div>
+</div>
+
+<!-- ══ INTEL ══════════════════════════════ -->
+<div id="view-intel" class="view">
+  <div class="pg-head"><div class="pg-title">Intel</div><div class="pg-sub">Performance metrics</div></div>
+  <div class="sgrid">
+    <div class="stile"><span class="si">⚡</span><div class="sv" id="si-n">—</div><div class="sl">Total Fasts</div></div>
+    <div class="stile"><span class="si">🔥</span><div class="sv gold" id="si-s">—</div><div class="sl">Day Streak</div></div>
+    <div class="stile"><span class="si">⏱</span><div class="sv" id="si-a">—</div><div class="sl">Avg Duration</div></div>
+    <div class="stile"><span class="si">🏆</span><div class="sv g" id="si-b">—</div><div class="sl">Longest Fast</div></div>
+    <div class="stile wide"><span class="si">📊</span><div class="sv" id="si-h">—</div><div class="sl">Total Hours</div></div>
+  </div>
+  <div class="ndmsg hidden" id="ndmsg">Start your first fast to generate intel</div>
+  <div class="sec">7-Day Overview</div>
+  <div class="wchart"><div class="wbars" id="wbars"></div><div style="display:flex;gap:5px" id="wdays"></div></div>
+  <div class="sec">This Month</div>
+  <div class="calwrap"><div class="calhead"><div class="calmth" id="calmth"></div><div class="calcnt" id="calcnt"></div></div><div class="calgrid" id="calgrid"></div></div>
+</div>
+
+<!-- ══ CONFIG ═════════════════════════════ -->
+<div id="view-config" class="view">
+  <div class="pg-head"><div class="pg-title">Config</div><div class="pg-sub">Preferences</div></div>
+  <div class="sec">Default Goal</div>
+  <div class="cfgsec" style="margin-bottom:14px">
+    <div class="cfggoals" id="cfggoals">
+      <div class="cgopt" data-h="12">12h</div><div class="cgopt" data-h="14">14h</div>
+      <div class="cgopt on" data-h="16">16h</div><div class="cgopt" data-h="18">18h</div>
+      <div class="cgopt" data-h="20">20h</div><div class="cgopt" data-h="24">24h</div>
+    </div>
+  </div>
+  <div class="sec">Options</div>
+  <div class="cfgsec" style="margin-bottom:8px">
+    <div class="cfggrp">
+      <div class="cfgrow"><div><div class="cfgt">24-Hour Clock</div><div class="cfgd">Use 24h format</div></div><div class="tog" id="tog24" onclick="togCfg('use24h',this)"></div></div>
+      <div class="cfgrow"><div><div class="cfgt">Price Quotes</div><div class="cfgd">Operator motivational quotes</div></div><div class="tog on" id="togq" onclick="togCfg('showQuotes',this)"></div></div>
+      <div class="cfgrow"><div><div class="cfgt">Notifications</div><div class="cfgd">Alert when goal is reached</div></div><div class="tog" id="togn" onclick="togNotif(this)"></div></div>
+    </div>
+  </div>
+  <div class="sec">Data</div>
+  <div class="cfgsec" style="margin-bottom:8px">
+    <div class="cfggrp">
+      <div class="cfgrow"><div><div class="cfgt">Export JSON</div><div class="cfgd">Full backup</div></div><button class="cfgact" onclick="expData('json')">Export</button></div>
+      <div class="cfgrow"><div><div class="cfgt">Export CSV</div><div class="cfgd">For spreadsheets</div></div><button class="cfgact" onclick="expData('csv')">Export</button></div>
+      <div class="cfgrow"><div><div class="cfgt">Import JSON</div><div class="cfgd">Restore backup</div></div><button class="cfgact" onclick="impData()">Import</button></div>
+    </div>
+  </div>
+  <div class="sec">Danger Zone</div>
+  <div class="cfgsec" style="margin-bottom:24px">
+    <div class="cfggrp"><div class="cfgrow"><div><div class="cfgt">Reset All Data</div><div class="cfgd">Permanently delete everything</div></div><button class="cfgact danger" onclick="doReset()">Reset</button></div></div>
+  </div>
+  <div class="cfgfoot">TF141 Fast · v4.0<br>"The best handpicked warriors on the planet."<br>— Cpt. Price</div>
+</div>
+
+<!-- ══ PHASES ══════════════════════════════ -->
+<div id="view-phases" class="view">
+
+  <div id="ph-head">
+    <div id="ph-title">Phases</div>
+    <div style="font-size:12px;color:var(--t3);margin-top:4px">Live fasting timeline</div>
+    <div id="ph-disclaimer">Estimated phases based on fasting duration only.<br>Not a direct biological measurement.</div>
+  </div>
+
+  <!-- Hero card: current phase + elapsed + next -->
+  <div id="ph-hero" class="inactive">
+    <div id="ph-hero-eyebrow">Current Phase</div>
+    <div id="ph-hero-phase">—</div>
+    <div id="ph-hero-sub">Start a fast to track your phases.</div>
+    <div id="ph-hero-elapsed">00:00</div>
+    <div id="ph-next" class="done">
+      <div>
+        <div id="ph-next-label">Next milestone</div>
+        <div id="ph-next-name">—</div>
+      </div>
+      <div id="ph-next-countdown">—</div>
+    </div>
+  </div>
+
+  <!-- Standby message when not fasting -->
+  <div id="ph-standby">
+    <span class="ph-sb-icon">⚡</span>
+    <div class="ph-sb-t">Not Currently Fasting</div>
+    Start a fast from the Timer tab to see your live phase progression.
+  </div>
+
+  <!-- Vertical timeline -->
+  <div id="ph-timeline">
+    <div id="ph-line-track"></div>
+    <div id="ph-line-fill"></div>
+    <!-- rows injected by JS -->
+  </div>
+
+</div>
+
+<!-- ══ NAV ════════════════════════════════ -->
+<nav id="nav">
+  <button class="nt on" onclick="navTo('timer',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>Timer</button>
+  <button class="nt" onclick="navTo('log',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Log</button>
+  <button class="nt" onclick="navTo('phases',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>Phases</button>
+  <button class="nt" onclick="navTo('intel',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Intel</button>
+  <button class="nt" onclick="navTo('config',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Config</button>
+</nav>
+</div>
+
+<div id="overlay" onclick="bgClose(event)"><div id="sheet"><div class="shtitle" id="shtitle">—</div><div id="shbody"></div><div class="sacts" id="sacts"></div></div></div>
+<div id="toast"></div>
+<input type="file" id="fimp" accept=".json" style="display:none" onchange="onImp(event)">
+
+<script>
+'use strict';
+
+/* ── PIXEL PRICE (7 weight stages) ───── */
+const PC={_:null,S:'#d4a882',B:'#3e5c28',D:'#283c18',T:'#7a6a40',K:'#101808',W:'#d0bc90',M:'#4a3020',H:'#1e2c14',E:'#c8a040',R:'#cc2820'};
+
+function buildPrice(stage){
+  const PW=32,PH=40,g=Array.from({length:PH},()=>new Array(PW).fill(null));
+  const fr=(r,c,h,w,col)=>{for(let rr=r;rr<r+h&&rr<PH;rr++)for(let cc=c;cc<c+w&&cc<PW;cc++)g[rr][cc]=col;};
+  const sp=(r,c,col)=>{if(r>=0&&r<PH&&c>=0&&c<PW)g[r][c]=col;};
+  const BW=[18,16,14,12,10,8,6][stage],BL=Math.floor((PW-BW)/2);
+  const HW=Math.max(8,BW-2),HL=Math.floor((PW-HW)/2);
+  fr(0,HL+1,1,HW-2,PC.H);fr(1,HL,4,HW,PC.H);fr(4,HL-1,1,HW+2,PC.D);
+  fr(5,HL,8,HW,PC.S);
+  sp(7,HL+2,stage===6?PC.R:PC.E);sp(7,HL+HW-3,stage===6?PC.R:PC.E);
+  const ML=HL+Math.floor(HW/2)-2;
+  fr(9,ML,2,5,PC.M);fr(10,ML-1,1,7,PC.W);
+  if(stage<6)fr(11,HL+1,2,HW-2,PC.W);
+  fr(13,HL+Math.floor(HW/2)-1,2,3,PC.S);
+  fr(15,BL,10,BW,PC.B);fr(24,BL,2,BW,PC.T);
+  if(stage<5){fr(17,BL,6,3,PC.D);fr(17,BL+BW-3,6,3,PC.D);}
+  if(stage===6)for(let i=0;i<4;i++)fr(16+i*2,BL+1,1,BW-2,PC.S);
+  const AW=Math.max(1,Math.floor((BW-4)/4));
+  fr(15,BL-AW,10,AW,PC.B);fr(25,BL-AW,3,AW,PC.S);
+  fr(15,BL+BW,10,AW,PC.B);fr(25,BL+BW,3,AW,PC.S);
+  if(stage<5){fr(27,BL+BW+AW,2,4,PC.K);fr(28,BL+BW+AW-1,1,6,PC.K);}
+  const LW=Math.max(1,Math.floor(BW/3));
+  fr(26,BL,9,LW,PC.D);fr(26,BL+BW-LW,9,LW,PC.D);
+  fr(35,BL-1,5,LW+2,PC.K);fr(35,BL+BW-LW-1,5,LW+2,PC.K);
+  return g;
+}
+
+const SNAMES=['OBESE','FAT','CHUBBY','NORMAL','SLIM','LEAN','SKELETON'];
+const SQUOTES=[
+  ['"Ease up on the MREs, Price."','"The doorway is just too small."','"Buffet two clicks north."'],
+  ['"Movement is optional. Cover is mandatory."','"I\'m not slow. I\'m deliberate."','"Pass me the rations, Gaz."'],
+  ['"We move at first light. After breakfast."','"The SAS builds character. And appetite."','"Mission: locate the mess hall."'],
+  ['"Welcome to Task Force 141."','"If in doubt, don\'t."','"Price is always in the field."'],
+  ['"Now we\'re moving. Good hustle."','"Lighter. Faster. Deadlier."','"The body is a weapon."'],
+  ['"Hard targeting. Stay frosty."','"This is training, not suffering."','"Elite operators skip breakfast."'],
+  ['"...I may have overdone it."','"Someone call a medic. And a sandwich."','"Ghost said I look tactical."'],
+];
+
+let _ls=-1,_qi=0;
+function drawPrice(stage){
+  if(stage===_ls)return; _ls=stage;
+  const cv=document.getElementById('price-cv'),ctx=cv.getContext('2d');
+  ctx.clearRect(0,0,32,40);
+  buildPrice(stage).forEach((row,r)=>row.forEach((col,c)=>{if(col){ctx.fillStyle=col;ctx.fillRect(c,r,1,1);}}));
+  document.getElementById('stage-name').textContent=SNAMES[stage];
+}
+function rotQuote(stage){
+  const el=document.getElementById('op-quote');
+  if(!ST.settings.showQuotes){el.textContent='';return;}
+  el.style.opacity=0;
+  setTimeout(()=>{_qi=(_qi+1)%SQUOTES[stage].length;el.textContent=SQUOTES[stage][_qi];el.style.opacity=1;},260);
+}
+
+/* ── STATE ────────────────────────────── */
+const KEY='tf141_v4';
+let ST={fasting:false,startTime:null,goalHours:16,logs:[],settings:{use24h:false,defaultGoal:16,showQuotes:true,notif:false}};
+function load(){try{const r=localStorage.getItem(KEY);if(!r)return;const s=JSON.parse(r);ST={...ST,...s};if(s.settings)ST.settings={...ST.settings,...s.settings};if(!Array.isArray(ST.logs))ST.logs=[];}catch(e){}}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(ST));}catch(e){}}
+
+/* ── NAV ──────────────────────────────── */
+function navTo(name,btn){
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.querySelectorAll('.nt').forEach(b=>b.classList.remove('on'));
+  document.getElementById('view-'+name).classList.add('active');
+  btn.classList.add('on');
+  if(name==='log')renderLog();
+  if(name==='intel')renderIntel();
+  if(name==='config')renderConfig();
+  if(name==='phases')renderPhases();
+}
+
+/* ── TIMER ENGINE (requestAnimationFrame) ── */
+let _raf=null,_lastSec=-1;
+function rafStart(){
+  if(_raf)return;
+  (function tick(){
+    if(!ST.fasting){_raf=null;return;}
+    const sec=Math.floor((Date.now()-ST.startTime)/1000);
+    if(sec!==_lastSec){
+      _lastSec=sec;
+      renderTimer();
+      if(document.getElementById('view-phases').classList.contains('active')) renderPhases();
+    }
+    _raf=requestAnimationFrame(tick);
+  })();
+}
+function rafStop(){if(_raf){cancelAnimationFrame(_raf);_raf=null;}_lastSec=-1;}
+
+function startFast(){
+  if(ST.fasting)return;
+  ST.fasting=true;ST.startTime=Date.now();_lastSec=-1;_ls=-1;
+  save();rafStart();renderTimer();toast('Fast started. Stay strong.');
+  schedNotif();
+}
+function endFast(){
+  if(!ST.fasting)return;
+  const end=Date.now(),dur=end-ST.startTime;
+  if(dur>=60000)ST.logs.unshift({id:Date.now().toString(),startTime:ST.startTime,endTime:end,duration:dur,goalHours:ST.goalHours,goalReached:dur>=ST.goalHours*3600000,notes:'',manual:false});
+  ST.fasting=false;ST.startTime=null;_ls=-1;save();rafStop();renderTimer();
+  toast('Fast ended. Well done, soldier.');
+}
+function resetFast(){
+  if(!ST.fasting)return;
+  conf('Abort fast?','Current fast will be discarded.',()=>{ST.fasting=false;ST.startTime=null;_ls=-1;save();rafStop();renderTimer();toast('Fast reset.');});
+}
+
+/* ── RENDER TIMER ─────────────────────── */
+function renderTimer(){
+  const el=Date.now(),ms=ST.fasting?el-ST.startTime:0;
+  const gms=ST.goalHours*3600000,pct=ST.fasting?Math.min(ms/gms,1):0;
+  const ach=ST.fasting&&ms>=gms;
+
+  document.body.className=ach?'achieved':ST.fasting?'fasting':'';
+  document.getElementById('timer-display').textContent=fmt(ms);
+
+  // Status pill
+  const p=document.getElementById('spill'),t=document.getElementById('stext');
+  if(ach){p.className='spill ach';t.textContent='Goal Reached';}
+  else if(ST.fasting){p.className='spill on';const pc=Math.round(pct*100);t.textContent=pc<15?'Fasting':pc<70?'In Progress':'Almost There';}
+  else{p.className='spill';t.textContent='Standby';}
+
+  // Progress
+  document.getElementById('prog-fill').style.width=(pct*100)+'%';
+  document.getElementById('prog-pct').textContent=Math.round(pct*100)+'%';
+  document.getElementById('prog-remain').textContent=ST.fasting&&!ach?fmt(Math.max(0,gms-ms))+' left':ach?'Complete ✓':'Not fasting';
+  document.getElementById('goal-lbl-val').textContent=ST.goalHours+'h';
+
+  // Achieved
+  document.getElementById('achieved-wrap').classList.toggle('show',ach);
+
+  // Price
+  const stage=ST.fasting?Math.min(6,Math.floor(pct*7)):0;
+  drawPrice(stage);
+
+  // Button
+  const btn=document.getElementById('btn-go');
+  if(ST.fasting){btn.innerHTML=`<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="5" height="14" rx="1"/><rect x="14" y="5" width="5" height="14" rx="1"/></svg> End Fast`;btn.className='stop';}
+  else{btn.innerHTML=`<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg> Start Fast`;btn.className='';}
+
+  // Chips
+  const last=ST.logs[0]||null;
+  document.getElementById('ch-last').textContent=last?fmtS(last.duration):ST.fasting?'Active now':'—';
+  const s=streak();document.getElementById('ch-streak').textContent=s>0?`${s}d${s>=3?' 🔥':''}`:'—';
+  document.getElementById('ch-total').textContent=ST.logs.length;
+}
+
+/* ── PRESETS ──────────────────────────── */
+document.querySelectorAll('.gp').forEach(b=>b.addEventListener('click',()=>{
+  if(ST.fasting){toast('Can\'t change goal while fasting.');return;}
+  setGoal(parseInt(b.dataset.h));
+}));
+document.getElementById('goal-input').addEventListener('change',function(){
+  const h=Math.max(1,Math.min(72,parseInt(this.value)||16));this.value=h;
+  if(ST.fasting){toast('Can\'t change goal while fasting.');return;}
+  setGoal(h);
+});
+function setGoal(h){
+  ST.goalHours=h;save();
+  document.getElementById('goal-input').value=h;
+  document.querySelectorAll('.gp').forEach(b=>b.classList.toggle('on',parseInt(b.dataset.h)===h));
+  renderTimer();
+}
+
+/* ── LOG ──────────────────────────────── */
+function renderLog(){
+  const list=document.getElementById('log-list'),emp=document.getElementById('lempty');
+  document.getElementById('log-sub').textContent=`${ST.logs.length} fast${ST.logs.length!==1?'s':''} recorded`;
+  if(!ST.logs.length){list.innerHTML='';emp.classList.remove('hidden');return;}
+  emp.classList.add('hidden');
+  list.innerHTML=ST.logs.map(l=>{
+    const h=Math.floor(l.duration/3600000),m=Math.floor((l.duration%3600000)/60000);
+    const dur=h>0?`${h}h ${m}m`:`${m}m`;
+    const badge=l.manual?'<span class="lbadge manual">Manual</span>':l.goalReached?'<span class="lbadge ok">Goal ✓</span>':'<span class="lbadge partial">Partial</span>';
+    return `<div class="litem${l.goalReached?' gold':''}">
+      <div class="lico">${l.goalReached?'🏆':l.manual?'✏️':'⚡'}</div>
+      <div class="lbody"><div class="ldur">${dur}</div><div class="lmeta">${fmtTs(l.startTime)} → ${fmtTs(l.endTime)}</div>${l.notes?`<div class="lnote">${esc(l.notes)}</div>`:''}</div>
+      ${badge}
+      <button class="ldel" onclick="delLog('${l.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3,6 5,6 21,6"/><path d="M19,6v14a2,2,0,0,1-2,2H7a2,2,0,0,1-2-2V6"/></svg></button>
+    </div>`;
+  }).join('');
+}
+function delLog(id){conf('Delete entry?','This fast will be removed.',()=>{ST.logs=ST.logs.filter(l=>l.id!==id);save();renderLog();toast('Entry deleted.');});}
+function openManual(){
+  const now=toInp(Date.now()),ago=toInp(Date.now()-ST.goalHours*3600000);
+  openSheet('Log Manual Fast',`
+    <div class="srow"><label class="slbl">Start Time</label><input class="sinput" type="datetime-local" id="ms" value="${ago}"></div>
+    <div class="srow"><label class="slbl">End Time</label><input class="sinput" type="datetime-local" id="me" value="${now}"></div>
+    <div class="srow"><label class="slbl">Notes (optional)</label><textarea class="sinput" id="mn" placeholder="Any notes…"></textarea></div>
+  `,[{label:'Log Fast',ok:true,action:saveManual},{label:'Cancel',ok:false,action:closeSheet}]);
+}
+function saveManual(){
+  const s=new Date(document.getElementById('ms').value).getTime(),e=new Date(document.getElementById('me').value).getTime(),n=document.getElementById('mn').value.trim();
+  if(!s||!e||e<=s){toast('Invalid times.');return;}
+  const dur=e-s;
+  ST.logs.unshift({id:Date.now().toString(),startTime:s,endTime:e,duration:dur,goalHours:ST.goalHours,goalReached:dur>=ST.goalHours*3600000,notes:n,manual:true});
+  ST.logs.sort((a,b)=>b.startTime-a.startTime);
+  save();renderLog();closeSheet();toast('Fast logged.');
+}
+function clearLog(){conf('Clear all entries?','All fasting history will be deleted.',()=>{ST.logs=[];save();renderLog();renderTimer();toast('History cleared.');});}
+
+/* ── INTEL ────────────────────────────── */
+function renderIntel(){
+  const L=ST.logs,has=L.length>0;
+  document.getElementById('ndmsg').classList.toggle('hidden',has);
+  const set=(id,v,c)=>{const e=document.getElementById(id);e.textContent=v;e.className='sv'+(c?' '+c:'');};
+  const nd=id=>{const e=document.getElementById(id);e.textContent='No data';e.className='sv nd';};
+  if(!has){['si-n','si-s','si-a','si-b','si-h'].forEach(nd);}
+  else{
+    set('si-n',L.length,'');set('si-s',streak(),'gold');
+    set('si-a',fmtS(L.reduce((s,l)=>s+l.duration,0)/L.length),'');
+    set('si-b',fmtS(Math.max(...L.map(l=>l.duration))),'g');
+    set('si-h',fmtS(L.reduce((s,l)=>s+l.duration,0)),'');
+  }
+  renderWeek(L);renderCal(L);
+}
+function renderWeek(L){
+  const DN=['S','M','T','W','T','F','S'],now=new Date(),data=[];
+  for(let i=6;i>=0;i--){const d=new Date(now);d.setDate(d.getDate()-i);const k=dk(d);const h=L.filter(l=>dk(new Date(l.startTime))===k).reduce((s,l)=>s+l.duration,0)/3600000;data.push({d:DN[d.getDay()],h,isToday:i===0});}
+  const mx=Math.max(...data.map(d=>d.h),1);
+  document.getElementById('wbars').innerHTML=data.map(d=>{const p=Math.max(d.h/mx*100,d.h>0?6:0);let c='wb';if(!d.h&&!d.isToday)c+=' empty';else if(d.isToday&&ST.fasting)c+=' cur';else if(d.isToday)c+=' today';return `<div class="wbw"><div class="${c}" style="height:${p}%"></div></div>`;}).join('');
+  document.getElementById('wdays').innerHTML=data.map(d=>`<div class="wbw"><span class="wd${d.isToday?' today':''}">${d.d}</span></div>`).join('');
+}
+function renderCal(L){
+  const now=new Date(),y=now.getFullYear(),mo=now.getMonth();
+  const MN=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  document.getElementById('calmth').textContent=MN[mo]+' '+y;
+  const fasted=new Set(L.filter(l=>{const d=new Date(l.startTime);return d.getFullYear()===y&&d.getMonth()===mo;}).map(l=>new Date(l.startTime).getDate()));
+  const goals=new Set(L.filter(l=>{const d=new Date(l.startTime);return d.getFullYear()===y&&d.getMonth()===mo&&l.goalReached;}).map(l=>new Date(l.startTime).getDate()));
+  document.getElementById('calcnt').textContent=fasted.size+' fasting days';
+  const first=new Date(y,mo,1).getDay(),days=new Date(y,mo+1,0).getDate(),today=now.getDate();
+  let h='';['S','M','T','W','T','F','S'].forEach(d=>{h+=`<div class="cc lbl">${d}</div>`;});
+  for(let i=0;i<first;i++)h+='<div class="cc"></div>';
+  for(let d=1;d<=days;d++){let c='cc';if(goals.has(d))c+=' achieved';else if(fasted.has(d))c+=' fasted';if(d===today)c+=' today';h+=`<div class="${c}">${d}</div>`;}
+  document.getElementById('calgrid').innerHTML=h;
+}
+
+/* ── CONFIG ───────────────────────────── */
+function renderConfig(){
+  document.getElementById('tog24').classList.toggle('on',ST.settings.use24h);
+  document.getElementById('togq').classList.toggle('on',ST.settings.showQuotes);
+  document.getElementById('togn').classList.toggle('on',ST.settings.notif);
+  document.querySelectorAll('#cfggoals .cgopt').forEach(o=>{
+    const h=parseInt(o.dataset.h);o.classList.toggle('on',h===ST.settings.defaultGoal);
+    o.onclick=()=>{ST.settings.defaultGoal=h;ST.goalHours=h;save();document.querySelectorAll('#cfggoals .cgopt').forEach(x=>x.classList.remove('on'));o.classList.add('on');setGoal(h);toast(`Default: ${h}h`);};
+  });
+}
+function togCfg(key,el){ST.settings[key]=!ST.settings[key];el.classList.toggle('on',ST.settings[key]);save();if(key==='showQuotes'){document.getElementById('op-quote').textContent=ST.settings.showQuotes?SQUOTES[_ls<0?0:_ls][0]:'';}}
+function togNotif(el){
+  if(!ST.settings.notif&&'Notification' in window){
+    Notification.requestPermission().then(p=>{ST.settings.notif=p==='granted';el.classList.toggle('on',ST.settings.notif);save();toast(p==='granted'?'Notifications on.':'Permission denied.');});
+  }else{ST.settings.notif=false;el.classList.remove('on');save();toast('Notifications off.');}
+}
+function schedNotif(){
+  if(!ST.settings.notif||!ST.fasting)return;
+  const ms=ST.goalHours*3600000-(Date.now()-ST.startTime);if(ms<=0)return;
+  setTimeout(()=>{if(ST.fasting&&Notification.permission==='granted')new Notification('TF141 Fast',{body:`${ST.goalHours}h complete. Goal reached. Price approves. 🏆`,tag:'tf141'});},ms);
+}
+function doReset(){conf('Reset all data?','Permanently delete everything.',()=>{localStorage.removeItem(KEY);location.reload();});}
+
+/* ── EXPORT / IMPORT ──────────────────── */
+function expData(fmt){
+  if(fmt==='json'){dl(new Blob([JSON.stringify(ST.logs,null,2)],{type:'application/json'}),'tf141-fasts.json');}
+  else{const r=[['id','startTime','endTime','durationMs','durationH','goalHours','goalReached','manual','notes']];ST.logs.forEach(l=>r.push([l.id,new Date(l.startTime).toISOString(),new Date(l.endTime).toISOString(),l.duration,(l.duration/3600000).toFixed(2),l.goalHours,l.goalReached,l.manual||false,(l.notes||'').replace(/,/g,';')]));dl(new Blob([r.map(x=>x.join(',')).join('\n')],{type:'text/csv'}),'tf141-fasts.csv');}
+  toast('Exported.');
+}
+function dl(blob,name){const u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download=name;a.click();URL.revokeObjectURL(u);}
+function impData(){document.getElementById('fimp').click();}
+function onImp(e){
+  const f=e.target.files[0];if(!f)return;
+  const r=new FileReader();r.onload=ev=>{try{const data=JSON.parse(ev.target.result);if(!Array.isArray(data))throw 0;conf(`Import ${data.length} entries?`,'Will merge with existing.',()=>{const ids=new Set(ST.logs.map(l=>l.id));data.forEach(l=>{if(!ids.has(l.id))ST.logs.push(l);});ST.logs.sort((a,b)=>b.startTime-a.startTime);save();toast(`Imported ${data.length}.`);});}catch{toast('Invalid JSON.');}};
+  r.readAsText(f);e.target.value='';
+}
+
+/* ── SHEET ────────────────────────────── */
+function openSheet(title,body,actions){
+  document.getElementById('shtitle').textContent=title;document.getElementById('shbody').innerHTML=body;
+  const el=document.getElementById('sacts');el.innerHTML='';
+  actions.forEach(a=>{const b=document.createElement('button');b.className='sbtn '+(a.ok?'ok':'cancel');b.textContent=a.label;b.onclick=a.action;el.appendChild(b);});
+  document.getElementById('overlay').classList.add('open');
+}
+function closeSheet(){document.getElementById('overlay').classList.remove('open');}
+function bgClose(e){if(e.target===document.getElementById('overlay'))closeSheet();}
+function conf(title,msg,cb){openSheet(title,`<p class="sctxt">${msg}</p>`,[{label:'Confirm',ok:true,action:()=>{closeSheet();cb();}},{label:'Cancel',ok:false,action:closeSheet}]);}
+
+/* ── TOAST ────────────────────────────── */
+let _tt;
+function toast(msg){const e=document.getElementById('toast');e.textContent=msg;e.classList.add('show');clearTimeout(_tt);_tt=setTimeout(()=>e.classList.remove('show'),2800);}
+
+/* ── HELPERS ──────────────────────────── */
+function fmt(ms){const s=Math.floor(ms/1000);return `${pad(Math.floor(s/3600))}:${pad(Math.floor((s%3600)/60))}:${pad(s%60)}`;}
+function fmtS(ms){const h=Math.floor(ms/3600000),m=Math.floor((ms%3600000)/60000);return h>0?`${h}h ${m}m`:`${m}m`;}
+function fmtTs(ts){const d=new Date(ts);return d.toLocaleDateString('en-US',{month:'short',day:'numeric'})+' '+d.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',hour12:!ST.settings.use24h});}
+function toInp(ts){const d=new Date(ts),p=n=>String(n).padStart(2,'0');return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;}
+function pad(n){return String(n).padStart(2,'0');}
+function dk(d){return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;}
+function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
+function streak(){
+  const days=new Set(ST.logs.map(l=>dk(new Date(l.startTime))));let s=0;const c=new Date();
+  for(let i=0;i<365;i++){if(days.has(dk(c))||(i===0&&ST.fasting)){s++;c.setDate(c.getDate()-1);}else break;}return s;
+}
+
+/* ── EVENTS ───────────────────────────── */
+document.getElementById('btn-go').addEventListener('click',()=>ST.fasting?endFast():startFast());
+document.getElementById('btn-rst').addEventListener('click',resetFast);
+document.getElementById('btn-manual').addEventListener('click',openManual);
+document.getElementById('btn-clearlog').addEventListener('click',clearLog);
+
+// Quote rotation while fasting
+setInterval(()=>{if(ST.fasting&&ST.settings.showQuotes){const pct=Math.min((Date.now()-ST.startTime)/(ST.goalHours*3600000),1);rotQuote(Math.min(6,Math.floor(pct*7)));}},10000);
+
+if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(()=>{});
+
+/* ── PHASES ────────────────────────────────────────────────── */
+const PHASES = [
+  { h:0,  icon:'⚡', name:'Fast Started',            sub:'Digestive rest begins. Last meal processing.' },
+  { h:4,  icon:'📉', name:'Insulin Lowering',         sub:'Estimated decrease in insulin levels possible.' },
+  { h:8,  icon:'🔋', name:'Blood Sugar Stabilizing',  sub:'Possible stabilization of glucose levels.' },
+  { h:10, icon:'🔥', name:'Fat-Burning Shift',         sub:'Estimated shift toward fat as a fuel source.' },
+  { h:12, icon:'⚗️', name:'Ketosis Support',           sub:'Possible early ketone production support.' },
+  { h:14, icon:'🧬', name:'Early Autophagy Estimate',  sub:'Cellular cleanup processes may begin. Highly variable.' },
+  { h:16, icon:'🌑', name:'Deep Fasting Phase',         sub:'Extended fasting state. Estimated metabolic adaptation.' },
+];
+
+function renderPhases() {
+  const isF    = ST.fasting && !!ST.startTime;
+  const elapsed = isF ? Date.now() - ST.startTime : 0;
+  const elH    = elapsed / 3600000;
+
+  // Toggle standby vs timeline
+  document.getElementById('ph-standby').style.display = isF ? 'none' : 'block';
+  document.getElementById('ph-timeline').style.display = isF ? 'block' : 'none';
+
+  const hero = document.getElementById('ph-hero');
+
+  if (!isF) {
+    hero.className = 'inactive';
+    document.getElementById('ph-hero-phase').textContent   = '—';
+    document.getElementById('ph-hero-sub').textContent     = 'Start a fast to track your phases.';
+    document.getElementById('ph-hero-elapsed').textContent = '—';
+    document.getElementById('ph-next').className = 'done';
+    return;
+  }
+
+  // Active phase
+  let ai = 0;
+  for (let i = PHASES.length - 1; i >= 0; i--) {
+    if (elH >= PHASES[i].h) { ai = i; break; }
+  }
+  const cur  = PHASES[ai];
+  const next = PHASES[ai + 1] || null;
+
+  // Hero card
+  hero.className = 'active-phase';
+  document.getElementById('ph-hero-phase').textContent   = cur.name;
+  document.getElementById('ph-hero-sub').textContent     = cur.sub;
+  document.getElementById('ph-hero-elapsed').textContent = fmtHM(elapsed);
+
+  // Next milestone
+  const nxEl = document.getElementById('ph-next');
+  if (next) {
+    nxEl.className = '';
+    document.getElementById('ph-next-name').textContent      = next.name;
+    const left = next.h * 3600000 - elapsed;
+    document.getElementById('ph-next-countdown').textContent = fmtHM(Math.max(0, left));
+  } else {
+    nxEl.className = 'done';
+  }
+
+  // Timeline rows
+  const tl = document.getElementById('ph-timeline');
+  tl.querySelectorAll('.ph-row').forEach(r => r.remove());
+
+  PHASES.forEach((ph, i) => {
+    const isDone   = i < ai;
+    const isActive = i === ai;
+    const row = document.createElement('div');
+    row.className = 'ph-row ' + (isDone ? 'done' : isActive ? 'active' : 'upcoming');
+
+    let sub = '';
+    if (isActive) {
+      const nextH   = PHASES[i + 1] ? PHASES[i + 1].h : ph.h + 2;
+      const durMs   = (nextH - ph.h) * 3600000;
+      const phEl    = elapsed - ph.h * 3600000;
+      const pct     = Math.min(Math.max(phEl / durMs * 100, 0), 100);
+      sub = `<div class="ph-subprog"><div class="ph-subprog-fill" style="width:${pct}%"></div></div>`;
+    }
+
+    row.innerHTML = `
+      <div class="ph-icon-wrap">${ph.icon}</div>
+      <div class="ph-content">
+        <div class="ph-hour">${ph.h === 0 ? 'START' : ph.h + 'h'}</div>
+        <div class="ph-name">${ph.name}</div>
+        <div class="ph-desc">${ph.sub}</div>
+        <div class="ph-here">▶ You are here</div>
+        ${sub}
+      </div>`;
+    tl.appendChild(row);
+  });
+
+  // Fill line
+  const linePct = Math.min(elH / PHASES[PHASES.length - 1].h * 100, 100);
+  document.getElementById('ph-line-fill').style.height = linePct + '%';
+}
+
+function fmtHM(ms) {
+  const m = Math.floor(ms / 60000);
+  const h = Math.floor(m / 60);
+  return h > 0 ? `${h}h ${pad(m % 60)}m` : `${m % 60 === 0 && h === 0 ? '0' : m}m`;
+}
+
+/* ── INIT ─────────────────────────────── */
+(function(){
+  load();
+  document.querySelectorAll('.gp').forEach(b=>b.classList.toggle('on',parseInt(b.dataset.h)===ST.goalHours));
+  document.getElementById('goal-input').value=ST.goalHours;
+  _ls=-1; drawPrice(0);
+  document.getElementById('op-quote').textContent=SQUOTES[0][0];
+  if(ST.fasting&&ST.startTime){_lastSec=-1;rafStart();schedNotif();}
+  renderTimer();
+})();
+</script>
+</body>
+</html>
