@@ -1,0 +1,18 @@
+{
+  "name": "TF141 Fast",
+  "short_name": "TF141",
+  "description": "Task Force 141 Intermittent Fasting Protocol",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#070b10",
+  "theme_color": "#070b10",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' fill='%23070b10'/%3E%3Ctext y='360' x='256' font-size='320' text-anchor='middle' fill='%2300ff9c'%3E⚡%3C/text%3E%3C/svg%3E",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
